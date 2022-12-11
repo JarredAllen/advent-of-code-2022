@@ -7,10 +7,8 @@ data Position = Position Integer Integer
     deriving (Show, Eq, Ord)
 data Map = Map (Set.Set Position)
     deriving Show
--- Head position first, then tail
-data Rope = Rope Position Position
+data Rope = Rope [Position]
     deriving Show
-
 data Move = Up | Down | Left | Right
     deriving Show
 
@@ -62,31 +60,42 @@ updateTail (Position headx heady) tail@(Position tailx taily) = let
             _ -> undefined
         in moveFunc tail
 
+updateFollowing :: Position -> [Position] -> [Position]
+updateFollowing _ [] = []
+updateFollowing head (follow:tail) = let
+        new_follow = updateTail head follow
+        new_tail = updateFollowing new_follow tail
+    in new_follow:new_tail
+
 doMove :: Move -> (Map, Rope) -> (Map, Rope)
-doMove move (Map map, Rope head tail) = let
+doMove move (Map map, Rope (head:tail)) = let
         new_head = movePosition move head
-        new_tail = updateTail new_head tail
-        new_map = Map $ Set.insert new_tail map 
-    in (new_map, Rope new_head new_tail)
+        new_tail = updateFollowing new_head tail
+        new_map = Map $ Set.insert (last new_tail) map 
+    in (new_map, Rope (new_head:new_tail))
 
-puzzle1 :: Map -> Integer
-puzzle1 = countVisited
+puzzle :: Int -> [Move] -> Integer
+puzzle ropeLength moves = let
+        rope = Rope $ take ropeLength $ repeat $ Position 0 0
+        (final_map, _) = foldl (\x y -> doMove y x) (Map $ Set.empty, rope) moves
+    in countVisited final_map
 
+puzzle1 :: [Move] -> Integer
+puzzle1 = puzzle 2
 
 puzzle2 :: [Move] -> Integer
-puzzle2 = undefined
+puzzle2 = puzzle 10
 
 ---------------------------------------- Glue ----------------------------------------
 
 main :: IO ()
 main = do 
     moves <- parseInput
-    let start_map = Map $ Set.empty
-    let start_rope = Rope (Position 0 0) (Position 0 0)
-    let (final_map, final_rope) = foldl (\x y -> doMove y x) (start_map, start_rope) moves
+    let start_rope = Rope [Position 0 0, Position 0 0]
+    let (final_map, final_rope) = foldl (\x y -> doMove y x) (Map $ Set.empty, start_rope) moves
     -- print final_rope
     -- print final_map
-    let easy = puzzle1 final_map
+    let easy = puzzle1 moves
     putStr "Easy: "
     print easy
     let hard = puzzle2 moves
