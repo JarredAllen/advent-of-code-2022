@@ -20,20 +20,23 @@ data Op = Add Integer | Mul Integer | Square
 data Cond = Divisible Integer
     deriving Show
 
-puzzle1 :: Monkeys -> Integer
-puzzle1 monkeys = let
-        post_moves = foldl (\monkeys _ -> stepMonkeys monkeys) monkeys [1..20]
+puzzle :: (Op -> Integer -> Integer) -> Int -> Monkeys -> Integer
+puzzle opFunc numRounds monkeys = let
+        post_moves = List.iterate (stepMonkeys opFunc) monkeys !! numRounds
         activities = reverse $ List.sort $ getActivities post_moves
     in (activities !! 0) * (activities !! 1)
 
-puzzle2 :: Monkeys -> Integer
-puzzle2 = undefined
+puzzle1 :: Monkeys -> Integer
+puzzle1 = puzzle applyOpEasy 20
 
-stepMonkey :: Monkeys -> Int -> Monkeys
-stepMonkey (Monkeys monkeys items counts) idx = let
+puzzle2 :: Monkeys -> Integer
+puzzle2 = puzzle applyOpHard 10000
+
+stepMonkey :: (Op -> Integer -> Integer) -> Monkeys -> Int -> Monkeys
+stepMonkey opFunc (Monkeys monkeys items counts) idx = let
         monkey = monkeys !! idx
         thrownItems = items !! idx
-        updateWorries = updateWorry monkey thrownItems
+        updateWorries = updateWorry opFunc monkey thrownItems
         withCondTrue = filter (checkCond $ condition monkey) updateWorries
         withCondFalse = filter (not . (checkCond $ condition monkey)) updateWorries
         newTrueTarget = (items !! trueTarget monkey) ++ withCondTrue
@@ -42,16 +45,22 @@ stepMonkey (Monkeys monkeys items counts) idx = let
         newCounts = updateList idx ((fromIntegral . length) thrownItems + counts !! idx) counts
     in Monkeys monkeys newItems newCounts
 
-stepMonkeys :: Monkeys -> Monkeys
-stepMonkeys monkeys = foldl stepMonkey monkeys [0..length (getItems monkeys) - 1]
+stepMonkeys :: (Op -> Integer -> Integer) -> Monkeys -> Monkeys
+stepMonkeys opFunc monkeys = foldl (stepMonkey opFunc) monkeys [0..length (getItems monkeys) - 1]
 
-applyOp :: Op -> Integer -> Integer
-applyOp Square = (\x -> x * x `div` 3)
-applyOp (Add x) = (`div` 3) . (+ x)
-applyOp (Mul x) = (`div` 3) . (* x)
+applyOpEasy :: Op -> Integer -> Integer
+applyOpEasy Square = (\x -> x * x `div` 3)
+applyOpEasy (Add x) = (`div` 3) . (+ x)
+applyOpEasy (Mul x) = (`div` 3) . (* x)
 
-updateWorry :: Monkey -> [Integer] -> [Integer]
-updateWorry monkey = map (applyOp (operation monkey))
+-- mod by 223092870 because that preserves behavior while bounding number sizes, enabling computation
+applyOpHard :: Op -> Integer -> Integer
+applyOpHard Square = (\x -> x * x `mod` 223092870)
+applyOpHard (Add x) = (`mod` 223092870) . (+ x)
+applyOpHard (Mul x) = (`mod` 223092870) . (* x)
+
+updateWorry :: (Op -> Integer -> Integer) -> Monkey -> [Integer] -> [Integer]
+updateWorry opFunc monkey = map (opFunc (operation monkey))
 
 checkCond :: Cond -> Integer -> Bool
 checkCond (Divisible x) = (== 0) . (`mod` x)
@@ -71,6 +80,7 @@ main :: IO ()
 main = do 
     input <- parseInput
     let monkeys = makeMonkeys input
+    print $ getActivities $ List.iterate (stepMonkeys applyOpHard) monkeys !! 20
     let easy = puzzle1 monkeys
     putStr "Easy: "
     print easy
