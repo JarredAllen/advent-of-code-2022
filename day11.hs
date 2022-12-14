@@ -4,9 +4,9 @@ import System.IO
 import qualified Data.Map as Map
 import qualified Data.List as List
 
-import Util
+import Util (parseByLine, parseByDoubleLine, unpackListFromMapIndices, mapListByKey, updateList)
 
-data Monkeys = Monkeys [Monkey] [[Integer]]
+data Monkeys = Monkeys [Monkey] [[Integer]] [Integer]
     deriving Show
 
 data Monkey = Monkey { operation :: Op,
@@ -22,21 +22,28 @@ data Cond = Divisible Integer
 
 puzzle1 :: Monkeys -> Integer
 puzzle1 monkeys = let
-    monkeySteps = monkeys:List.scanl (\monkeys _ -> stepMonkeys monkeys) monkeys [1..19]
-    itemsPaths = map (\(Monkeys _ items) -> items) monkeySteps
-    itemsCounts = [map (fromIntegral . length) timestep | timestep <- itemsPaths]
-    monkeyActivites = List.sort $ foldr1 (\new tallies -> [n + t | (n,t) <- zip new tallies]) itemsCounts
-    in last monkeyActivites + last (init monkeyActivites)
+        post_moves = foldl (\monkeys _ -> stepMonkeys monkeys) monkeys [1..20]
+        activities = reverse $ List.sort $ getActivities post_moves
+    in (activities !! 0) * (activities !! 1)
 
 puzzle2 :: Monkeys -> Integer
 puzzle2 = undefined
 
+stepMonkey :: Monkeys -> Int -> Monkeys
+stepMonkey (Monkeys monkeys items counts) idx = let
+        monkey = monkeys !! idx
+        thrownItems = items !! idx
+        updateWorries = updateWorry monkey thrownItems
+        withCondTrue = filter (checkCond $ condition monkey) updateWorries
+        withCondFalse = filter (not . (checkCond $ condition monkey)) updateWorries
+        newTrueTarget = (items !! trueTarget monkey) ++ withCondTrue
+        newFalseTarget = (items !! falseTarget monkey) ++ withCondFalse
+        newItems = updateList idx [] $ updateList (trueTarget monkey) newTrueTarget $ updateList (falseTarget monkey) newFalseTarget items
+        newCounts = updateList idx ((fromIntegral . length) thrownItems + counts !! idx) counts
+    in Monkeys monkeys newItems newCounts
+
 stepMonkeys :: Monkeys -> Monkeys
-stepMonkeys (Monkeys monkeys items) = let
-        updateWorries = map (\(monkey, items) -> updateWorry monkey items) $ zip monkeys items
-        targets = mapListByKey $ List.concatMap (\(monkey, items) -> map (\item -> (getTarget monkey item, item)) items) $ zip monkeys updateWorries
-        newItems = unpackListFromMapIndices [] targets
-    in Monkeys monkeys newItems
+stepMonkeys monkeys = foldl stepMonkey monkeys [0..length (getItems monkeys) - 1]
 
 applyOp :: Op -> Integer -> Integer
 applyOp Square = (\x -> x * x `div` 3)
@@ -53,7 +60,10 @@ getTarget :: Monkey -> Integer -> Int
 getTarget monkey item = if checkCond (condition monkey) item then trueTarget monkey else falseTarget monkey
 
 getItems :: Monkeys -> [[Integer]]
-getItems (Monkeys _ items) = items
+getItems (Monkeys _ items _) = items
+
+getActivities :: Monkeys -> [Integer]
+getActivities (Monkeys _ _ activities) = activities
 
 ---------------------------------------- Glue ----------------------------------------
 
@@ -61,9 +71,6 @@ main :: IO ()
 main = do 
     input <- parseInput
     let monkeys = makeMonkeys input
-    let monkeySteps = List.scanl (\monkeys _ -> stepMonkeys monkeys) monkeys [1..19]
-    print monkeys
-    print $ getItems $ stepMonkeys monkeys
     let easy = puzzle1 monkeys
     putStr "Easy: "
     print easy
@@ -77,7 +84,7 @@ makeMonkeys :: [(Monkey, [Integer])] -> Monkeys
 makeMonkeys lst = let
         monkeys = map fst lst
         items = map snd lst
-    in Monkeys monkeys items
+    in Monkeys monkeys items [0 | _ <- items]
 
 parseInput :: IO [(Monkey, [Integer])]
 parseInput = parseByDoubleLine parseMonkey "day11.in"

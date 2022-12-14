@@ -1,4 +1,4 @@
-module Util (parseByLine, parseByDoubleLine, unpackListFromMapIndices, mapListByKey) where
+module Util (parseByLine, parseByDoubleLine, unpackListFromMapIndices, mapListByKey, updateList) where
 
 import System.IO
 import qualified Data.Map as Map
@@ -46,3 +46,6 @@ mapListByKey ((k,v):tail) = let
         lst = Map.findWithDefault [] k recurse
         newMap = Map.insert k (v:lst) recurse
     in newMap
+
+updateList :: Int -> a -> [a] -> [a]
+updateList i y xs = take i xs ++ [y] ++ drop (i+1) xs
