@@ -1,4 +1,4 @@
-module Util (parseByLine, parseByDoubleLine, unpackListFromMapIndices, mapListByKey, updateList) where
+module Util (parseByLine, parseByDoubleLine, unpackListFromMapIndices, mapListByKey, updateList, safeListIndex) where
 
 import System.IO
 import qualified Data.Map as Map
@@ -49,3 +49,8 @@ mapListByKey ((k,v):tail) = let
 
 updateList :: Int -> a -> [a] -> [a]
 updateList i y xs = take i xs ++ [y] ++ drop (i+1) xs
+
+safeListIndex :: Int -> [a] -> Maybe a
+safeListIndex _ [] = Nothing
+safeListIndex 0 (x:_) = Just x
+safeListIndex idx (_:tail) = safeListIndex (idx - 1) tail
