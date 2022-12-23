@@ -1,4 +1,4 @@
-module Util (parseByLine, parseByDoubleLine, unpackListFromMapIndices, mapListByKey, updateList, safeListIndex) where
+module Util (parseByLine, parseByDoubleLine, unpackListFromMapIndices, mapListByKey, updateList, safeListIndex, splitList, getDelimited) where
 
 import System.IO
 import qualified Data.Map as Map
@@ -54,3 +54,28 @@ safeListIndex :: Int -> [a] -> Maybe a
 safeListIndex _ [] = Nothing
 safeListIndex 0 (x:_) = Just x
 safeListIndex idx (_:tail) = safeListIndex (idx - 1) tail
+
+splitList :: (a -> Bool) -> [a] -> [[a]]
+splitList predicate lst = case dropWhile predicate lst of
+                            [] -> []
+                            lst' -> head:splitList predicate tail
+                                where (head, tail) = break predicate lst'
+
+countElem :: (Eq a) => a -> [a] -> Int
+countElem x = length . filter (== x)
+
+-- String manipulation
+
+-- For a string which begins with '[', '(', or '{', return the string contained
+-- in the delimiter opening the string and the tail after that delimiter
+getDelimited :: String -> (String, String)
+getDelimited (c:s) = let
+        (open, close) = case c of
+                            '[' -> ('[', ']')
+                            '(' -> ('(', ')')
+                            '{' -> ('{', '}')
+                            _ -> error $ "Argument must begin with '(', '[', or '{', not " ++ show c ++ "in argument " ++ show (c:s)
+        isBalanced n = countElem open (take n s) + 1 == countElem close (take n s)
+        close_idx = head $ filter isBalanced [1..length s+1]
+    in (take (close_idx-1) s, drop (close_idx + 1) s)
+getDelimited "" = error "Argument must be non-empty"
