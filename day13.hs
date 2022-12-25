@@ -3,9 +3,11 @@ module Day2 where
 import System.IO
 import qualified Data.Char as Char
 import qualified Data.List as List
-import Debug.Trace
+import Text.Parsec
+import Text.Parsec.Char as Parsec.Char
+import Text.ParserCombinators.Parsec
 
-import Util (parseByDoubleLine, splitList, getDelimited)
+import Util (parseByDoubleLine, splitList, getDelimited, indexed)
 
 data Packet = Num Int | PacketList [Packet]
     deriving Show
@@ -19,19 +21,13 @@ instance Ord Packet where
     (<=) (PacketList x) (PacketList y) = x <= y
     (<=) (Num x) (PacketList y) = [Num x] <= y
     (<=) (PacketList x) (Num y) = x <= [Num y]
-instance Read Packet where
-    readsPrec _ s@('[':_) = let
-            (inner, tail) = getDelimited s
-        in trace (show s ++ ": " ++ show (inner, tail)) [(PacketList $ map read $ splitList (== ',') inner, tail)]
-    readsPrec _ s = let
-            lastIdx = List.findIndex (`elem` ",]") s
-            num = case lastIdx of
-                Just idx -> take idx s
-                Nothing -> s
-            tail = case lastIdx of
-                Just idx -> drop idx s
-                Nothing -> ""
-        in trace (show s ++ ": " ++ show (num, tail))[(Num $ read num, tail)]
+
+isDivider :: Int -> Packet -> Bool
+isDivider num (PacketList [PacketList [Num num2]]) = num == num2
+isDivider _ _ = False
+
+divider :: Int -> Packet
+divider num = PacketList [PacketList [Num num]]
 
 data PacketPair = PacketPair Packet Packet
     deriving Show
@@ -39,19 +35,29 @@ data PacketPair = PacketPair Packet Packet
 inRightOrder :: PacketPair -> Bool
 inRightOrder (PacketPair left right) = left < right
 
+flatten :: [PacketPair] -> [Packet]
+flatten [] = []
+flatten (PacketPair left right:xs) = left:right:flatten xs
 
 puzzle1 :: [PacketPair] -> Int
-puzzle1 = length . filter inRightOrder
+puzzle1 = sum . map (\(idx,_) -> idx) . filter (\(_, pair) -> inRightOrder pair) . indexed
 
 puzzle2 :: [PacketPair]  -> Integer
-puzzle2 = undefined
+puzzle2 pairs = let
+        packets = List.sort $ divider 2:divider 6:flatten pairs
+        fstIdx = case List.findIndex (isDivider 2) packets of
+            Just idx -> fromIntegral idx
+            Nothing -> error "Couldn't find first distress packet"
+        sndIdx = case List.findIndex (isDivider 6) packets of
+            Just idx -> fromIntegral idx
+            Nothing -> error "Couldn't find first distress packet"
+    in (fstIdx+1) * (sndIdx+1)
 
 ---------------------------------------- Glue ----------------------------------------
 
 main :: IO ()
 main = do 
     input <- parseInput
-    print input
     let easy = puzzle1 input
     putStr "Easy: "
     print easy
@@ -66,9 +72,24 @@ parseInput = parseByDoubleLine parsePacketPair "day13.in"
 
 parsePacketPair :: String -> PacketPair
 parsePacketPair s = let
-        split = lines s
-        first = read $ split !! 0
-        second = read $ split !! 1
-    in PacketPair first second
+        packets = lines s
+        fst = case parse parsePacket "" $ packets !! 0 of
+            Right packet -> packet
+            Left err -> error $ "Failed to parse first packet " ++ show err ++ " from " ++ show s
+        snd = case parse parsePacket "" $ packets !! 1 of
+            Right packet -> packet
+            Left err -> error $ "Failed to parse second packet " ++ show err ++ " from " ++ show s
+    in PacketPair fst snd
+
+parsePacket :: Parser Packet
+parsePacket = parseNumPacket <|> parseListPacket
+
+parseNumPacket :: Parser Packet
+parseNumPacket = Num <$> read <$> many1 digit
+
+parseListPacket :: Parser Packet
+parseListPacket = do
+    items <- between (Parsec.Char.char '[') (Parsec.Char.char ']') $ sepBy parsePacket (Parsec.Char.char ',')
+    return $ PacketList items
 
 -----------------------------------------------------------------------------------------

@@ -1,4 +1,14 @@
-module Util (parseByLine, parseByDoubleLine, unpackListFromMapIndices, mapListByKey, updateList, safeListIndex, splitList, getDelimited) where
+module Util (
+        parseByLine,
+        parseByDoubleLine,
+        unpackListFromMapIndices,
+        mapListByKey,
+        updateList,
+        safeListIndex,
+        splitList,
+        getDelimited,
+        indexed
+    ) where
 
 import System.IO
 import qualified Data.Map as Map
@@ -63,6 +73,13 @@ splitList predicate lst = case dropWhile predicate lst of
 
 countElem :: (Eq a) => a -> [a] -> Int
 countElem x = length . filter (== x)
+
+indexed :: [a] -> [(Int, a)]
+indexed = indexedHelper 1
+
+indexedHelper :: Int -> [a] -> [(Int, a)]
+indexedHelper _ [] = []
+indexedHelper idx (h:tail) = (idx,h) : indexedHelper (idx+1) tail
 
 -- String manipulation
 
